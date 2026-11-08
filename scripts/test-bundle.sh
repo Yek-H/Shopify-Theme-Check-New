@@ -23,7 +23,7 @@ run "$tmp/theme" > "$tmp/bad.json" || status=$?
 jq -e 'any(.[]; .check == "LiquidHTMLSyntaxError")' "$tmp/bad.json"
 rm -- "$tmp/theme/snippets/bad.liquid"
 printf '%s\n' "require: './checks.cjs'" > "$tmp/theme/.theme-check.yml"
-printf '%s\n' "require('node:fs').writeFileSync(require('node:path').join(__dirname, 'executed'), 'yes'); module.exports = [];" > "$tmp/theme/checks.cjs"
+printf '%s\n' "require('node:fs').writeFileSync(require('node:path').join(__dirname, 'executed'), 'yes'); exports.checks = [];" > "$tmp/theme/checks.cjs"
 run "$tmp/theme" > /dev/null 2>"$tmp/denied.log"
 test ! -e "$tmp/theme/executed"
 rg -q 'Custom Theme Checks are disabled' "$tmp/denied.log"
