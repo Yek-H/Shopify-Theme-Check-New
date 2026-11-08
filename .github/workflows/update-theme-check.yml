@@ -32,11 +32,6 @@ jobs:
       - name: Checkout updater repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-
       - name: Detect latest Theme Check and Liquid docs
         id: detect
         env:
@@ -49,10 +44,10 @@ jobs:
           VERSION="$(npm view @shopify/theme-check-node version)"
           DOCS_SHA="$(git ls-remote https://github.com/Shopify/theme-liquid-docs.git refs/heads/main | awk '{print $1}')"
           DOCS_SHORT="${DOCS_SHA:0:7}"
-          TAG="theme-check-v${VERSION}-docs-${DOCS_SHORT}"
+          TAG="theme-check-v${VERSION}-docs-${DOCS_SHORT}-portable"
 
           BUILD="true"
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft,assets | jq -e --arg bundle "Shopify-theme-tools-$VERSION-linux-x64-node22.tar.gz" '(.isDraft | not) and (([.assets[].name] | sort) == ([$bundle, ($bundle + ".sha256"), "BUILD_METADATA.json"] | sort))' >/dev/null; then
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft,assets | jq -e --arg bundle "Shopify-theme-tools-$VERSION-linux-x64.tar.gz" '(.isDraft | not) and (([.assets[].name] | sort) == ([$bundle, ($bundle + ".sha256"), "BUILD_METADATA.json"] | sort))' >/dev/null; then
             BUILD="false"
           fi
 
@@ -98,6 +93,22 @@ jobs:
           ACTUAL="$(git -C upstream/theme-liquid-docs rev-parse HEAD)"
           EXPECTED="${{ steps.detect.outputs.docs_sha }}"
           test "$ACTUAL" = "$EXPECTED"
+
+      - name: Read upstream Node.js version
+        if: ${{ steps.detect.outputs.build == 'true' }}
+        id: runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          NODE_VERSION="$(ruby -ryaml -e 'puts YAML.safe_load_file(ARGV[0]).fetch("up").find { |item| item.is_a?(Hash) && item.key?("node") }.fetch("node").fetch("version")' upstream/theme-tools/dev.yml)"
+          [[ "$NODE_VERSION" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          echo "version=${NODE_VERSION#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup upstream Node.js
+        if: ${{ steps.detect.outputs.build == 'true' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.runtime.outputs.version }}
 
       - name: Install pnpm declared by Theme Tools
         if: ${{ steps.detect.outputs.build == 'true' }}
@@ -192,7 +203,7 @@ jobs:
           DOCS_SHA="${{ steps.detect.outputs.docs_sha }}"
           THEME_TOOLS_SHA="$(git -C upstream/theme-tools rev-parse HEAD)"
           GRAMMAR_SHA="$(git -C upstream/theme-tools submodule status packages/vscode-extension/syntaxes | awk '{print $1}' | sed 's/^[+-]//')"
-          BUNDLE="Shopify-theme-tools-${VERSION}-linux-x64-node22.tar.gz"
+          BUNDLE="Shopify-theme-tools-${VERSION}-linux-x64.tar.gz"
           STAGE="$RUNNER_TEMP/shopify-theme-tools-portable"
 
           jq -n             --arg theme_check_version "$VERSION"             --arg theme_tools_sha "$THEME_TOOLS_SHA"             --arg liquid_docs_sha "$DOCS_SHA"             --arg liquid_grammar_sha "$GRAMMAR_SHA"             --arg node_version "$(node --version)"             --arg pnpm_version "${{ steps.pnpm.outputs.version }}"             --arg built_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)"             --arg os "ubuntu-24.04"             --arg arch "linux-x64"             '{theme_check_version:$theme_check_version,theme_tools_sha:$theme_tools_sha,liquid_docs_sha:$liquid_docs_sha,liquid_grammar_sha:$liquid_grammar_sha,node_version:$node_version,pnpm_version:$pnpm_version,built_at:$built_at,os:$os,arch:$arch}'             > BUILD_METADATA.json
@@ -225,7 +236,7 @@ jobs:
         if: ${{ steps.detect.outputs.build == 'true' }}
         uses: actions/upload-artifact@v4
         with:
-          name: Shopify-theme-tools-${{ steps.detect.outputs.version }}-linux-x64-node22
+          name: Shopify-theme-tools-${{ steps.detect.outputs.version }}-linux-x64
           path: |
             ${{ steps.package.outputs.bundle }}
             ${{ steps.package.outputs.checksum }}
@@ -251,7 +262,7 @@ jobs:
           {
             echo "# Shopify Theme Check $VERSION"
             echo
-            echo "Clean Ubuntu 24.04 / Linux x64 / Node 22 build of Shopify Theme Tools."
+            echo "Clean Ubuntu 24.04 / Linux x64 / Node.js build of Shopify Theme Tools."
             echo
             printf -- '- Theme Check: `%s`\n' "$VERSION"
             printf -- '- Liquid docs: `%s`\n' "$DOCS_SHA"
