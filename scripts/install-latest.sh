@@ -18,7 +18,7 @@ PARENT="$(dirname -- "$DEST")"
 TMP="$(mktemp -d -- "$PARENT/.theme-check-install.XXXXXXXX")"
 trap 'rm -rf -- "$TMP"' EXIT
 curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" -o "$TMP/release.json"
-NAME="$(jq -er '[.assets[].name | select(test("^Shopify-theme-tools-[0-9]+\\.[0-9]+\\.[0-9]+-linux-x64-node22\\.tar\\.gz$"))] | if length == 1 then .[0] else error("Expected one bundle") end' "$TMP/release.json")"
+NAME="$(jq -er '[.assets[].name | select(test("^Shopify-theme-tools-[0-9]+\\.[0-9]+\\.[0-9]+-linux-x64\\.tar\\.gz$"))] | if length == 1 then .[0] else error("Expected one bundle") end' "$TMP/release.json")"
 for asset in "$NAME" "$NAME.sha256"; do
   url="$(jq -er --arg name "$asset" '.assets[] | select(.name == $name) | .browser_download_url' "$TMP/release.json")"
   [[ "$url" == "https://github.com/$REPO/releases/download/"* ]] || exit 1
