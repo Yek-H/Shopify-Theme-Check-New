@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+export SHOPIFY_TLD_ROOT="$ROOT/theme-liquid-docs"
+exec node "$ROOT/theme-check-local.cjs" "$@"
