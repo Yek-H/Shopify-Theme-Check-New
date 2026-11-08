@@ -26,6 +26,6 @@ printf '%s\n' "require: './checks.cjs'" > "$tmp/theme/.theme-check.yml"
 printf '%s\n' "require('node:fs').writeFileSync(require('node:path').join(__dirname, 'executed'), 'yes'); exports.checks = [];" > "$tmp/theme/checks.cjs"
 run "$tmp/theme" > /dev/null 2>"$tmp/denied.log"
 test ! -e "$tmp/theme/executed"
-rg -q 'Custom Theme Checks are disabled' "$tmp/denied.log"
+[[ $(<"$tmp/denied.log") == *'Custom Theme Checks are disabled'* ]]
 run --allow-custom-checks "$tmp/theme" > /dev/null
 test -f "$tmp/theme/executed"
