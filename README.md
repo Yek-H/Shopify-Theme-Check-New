@@ -3,108 +3,95 @@
 [![Update Shopify Theme Check Environment](https://github.com/Yek-H/Shopify-Theme-Check-New/actions/workflows/update-theme-check.yml/badge.svg)](https://github.com/Yek-H/Shopify-Theme-Check-New/actions/workflows/update-theme-check.yml)
 [![Latest release](https://img.shields.io/github/v/release/Yek-H/Shopify-Theme-Check-New?display_name=tag)](../../releases/latest)
 
-Automated, reproducible builds of the latest stable Shopify Theme Check from the official [Shopify Theme Tools](https://github.com/Shopify/theme-tools) release tag and frozen pnpm lockfile.
+Automated, reproducible Linux x64 builds of the latest stable Shopify Theme Check from the official [Shopify Theme Tools](https://github.com/Shopify/theme-tools) release tag and frozen pnpm lockfile.
 
-Each release bundles Theme Tools, its installed dependencies, compiled outputs, an exact snapshot of the [Shopify Liquid documentation](https://github.com/Shopify/theme-liquid-docs), and a local Theme Check launcher. Node.js is intentionally installed separately on the target machine.
+Each release includes the compiled Theme Tools environment, its installed dependencies, an exact [Shopify Liquid documentation](https://github.com/Shopify/theme-liquid-docs) snapshot, and a local `theme-check-local` launcher.
 
-## Download
+[Latest release](../../releases/latest) · [Update workflow](../../actions/workflows/update-theme-check.yml) · [Installer](scripts/install-latest.sh)
 
-The latest build is always available from [**Releases**](../../releases/latest).
+## Requirements
 
-Each release contains:
-
-- `Shopify-theme-tools-<version>-linux-x64.tar.gz`
-- a corresponding SHA-256 checksum file
-- `BUILD_METADATA.json`
+- **Platform:** Linux x64.
+- **Node.js:** installed separately, using the exact version recorded in the release's `BUILD_METADATA.json`.
+- **Installer commands:** `curl`, `jq`, `sha256sum`, `tar`, `node`, and `realpath`.
+- **Installation destination:** a new absolute directory whose parent already exists.
 
 > [!NOTE]
-> Releases target **Linux x64** and are built on **Ubuntu 24.04**. The required Node.js version follows the official Theme Tools `dev.yml` for that release and is recorded in `BUILD_METADATA.json`.
+> Releases are built on **Ubuntu 24.04**. Node.js is not bundled with the archive. pnpm is used only during the build and is not required on the target machine.
 
-## Install
+## Installation
 
-Install the Node.js version listed in the release's `BUILD_METADATA.json` before using the bundle or installer.
-
-After cloning this repository, install the latest release to a new absolute directory:
+Clone the repository and install the latest release into a new directory:
 
 ```bash
-bash scripts/install-latest.sh /absolute/path/to/new-directory
+git clone --depth 1 https://github.com/Yek-H/Shopify-Theme-Check-New.git
+cd Shopify-Theme-Check-New
+bash scripts/install-latest.sh "$HOME/shopify-theme-tools"
 ```
 
-The parent directory must already exist, and the destination itself must not exist. The installer verifies the release checksum, extracts into a temporary directory on the same filesystem, validates the bundled launcher, and then moves the completed installation into place without overwriting an existing directory.
+The installer:
 
-Then run Theme Check:
+1. Finds the latest GitHub Release.
+2. Downloads the Linux x64 archive and its SHA-256 checksum.
+3. Verifies the archive before extraction.
+4. Extracts into a temporary directory on the same filesystem.
+5. Runs `theme-check-local --version` against the extracted bundle.
+6. Moves the completed installation into the requested destination without overwriting an existing directory.
+
+To upgrade, install the new release into another fresh directory.
+
+## Usage
+
+Run Theme Check against an absolute theme path:
 
 ```bash
-/absolute/path/to/new-directory/theme-check-local /absolute/path/to/theme
+$HOME/shopify-theme-tools/theme-check-local /absolute/path/to/theme
 ```
 
-An optional Theme Check configuration can be passed as the second path:
+Optionally pass a Theme Check configuration as the second path:
 
 ```bash
-/absolute/path/to/new-directory/theme-check-local /absolute/path/to/theme /absolute/path/to/config.yml
+$HOME/shopify-theme-tools/theme-check-local /absolute/path/to/theme /absolute/path/to/config.yml
 ```
 
-The launcher outputs a JSON array of offenses.
+The launcher prints a JSON array of offenses to standard output.
 
-- Exit code `0`: no lint errors.
-- Exit code `1`: one or more lint errors.
-- Exit code `2`: invalid invocation or runtime failure.
+| Exit code | Meaning |
+| ---: | --- |
+| `0` | No lint errors |
+| `1` | One or more lint errors |
+| `2` | Invalid invocation or runtime failure |
 
-Third-party JavaScript checks are skipped by default. Enable them only for trusted theme configurations and dependencies:
+### Custom checks
+
+Third-party JavaScript checks are disabled by default.
+
+> [!WARNING]
+> Enable custom checks only when you trust the theme configuration and its dependencies.
+
+Place `--allow-custom-checks` before the theme path:
 
 ```bash
-/absolute/path/to/new-directory/theme-check-local --allow-custom-checks /absolute/path/to/theme
+$HOME/shopify-theme-tools/theme-check-local --allow-custom-checks /absolute/path/to/theme
 ```
 
-The `--allow-custom-checks` option must appear before the theme path.
+## Releases
 
-## What it tracks
+The latest build is available from [**GitHub Releases**](../../releases/latest).
 
-The updater monitors two independent upstream sources:
+Each release publishes:
 
-- **Theme Check / Theme Tools:** the latest stable `@shopify/theme-check-node` version published to npm.
-- **Shopify Liquid documentation:** the latest `main` commit from [Shopify/theme-liquid-docs](https://github.com/Shopify/theme-liquid-docs).
+- `Shopify-theme-tools-<version>-linux-x64.tar.gz`
+- `Shopify-theme-tools-<version>-linux-x64.tar.gz.sha256`
+- `BUILD_METADATA.json`
 
-For each Theme Tools release, the build also reads:
+To verify an archive manually:
 
-- **Node.js:** the version declared by the official Theme Tools `dev.yml`.
-- **pnpm:** the exact version declared by Theme Tools' `packageManager` field.
+```bash
+sha256sum -c Shopify-theme-tools-<version>-linux-x64.tar.gz.sha256
+```
 
-A new release is produced only when the detected Theme Check version and Liquid documentation state have not already been published, unless a manual run is forced.
-
-## Automatic updates
-
-The workflow runs every day at **06:00 UTC** and can also be launched manually from **Actions → Update Shopify Theme Check Environment**.
-
-Changes pushed to `.github/workflows/update-theme-check.yml` or `scripts/**` also run the updater. If the detected upstream state is already published, the workflow exits without rebuilding it.
-
-Manual runs can use the `force` option to rebuild even when the same upstream state already has a release.
-
-## Build process
-
-The GitHub Actions workflow:
-
-1. Detects the latest stable Theme Check version and latest Shopify Liquid documentation commit.
-2. Checks whether the exact Theme Check + Liquid docs state already has a complete published release.
-3. Checks out the matching official `Shopify/theme-tools` release tag with recursive submodules.
-4. Clones `Shopify/theme-liquid-docs` and verifies that its commit exactly matches the detected revision.
-5. Reads the required Node.js version from Theme Tools' own `dev.yml`.
-6. Reads and installs the pnpm version declared by Theme Tools' `packageManager` field.
-7. Installs dependencies with `pnpm install --frozen-lockfile`.
-8. Builds the complete Theme Tools monorepo.
-9. Runs type checking, unit tests, and format validation.
-10. Verifies expected compiled Theme Check and VS Code extension outputs.
-11. Runs a Theme Check smoke test against a minimal Shopify theme.
-12. Packages Theme Tools, its installed dependencies, compiled outputs, the exact Liquid documentation snapshot, and the local launcher.
-13. Generates `BUILD_METADATA.json`, creates a SHA-256 checksum, and builds the Linux x64 archive.
-14. Tests the final archive without pnpm to verify that the packaged launcher works independently of the build toolchain.
-15. Publishes both a GitHub Actions artifact and a permanent GitHub Release.
-
-Browser downloads are skipped because they are not required for the Theme Check build. pnpm is required only during compilation; the installed bundle requires Node.js but does not require pnpm.
-
-## Release contents
-
-The archive contains:
+### Archive contents
 
 ```text
 theme-tools/
@@ -114,7 +101,45 @@ theme-check-local.cjs
 BUILD_METADATA.json
 ```
 
-The bundled `theme-check-local` launcher resolves Theme Check from the packaged Theme Tools build and uses the bundled Liquid documentation snapshot.
+The launcher resolves Theme Check from the packaged Theme Tools build and uses the bundled Liquid documentation snapshot.
+
+## Automatic updates
+
+The updater monitors:
+
+- **Theme Check / Theme Tools:** the latest stable `@shopify/theme-check-node` version published to npm.
+- **Shopify Liquid documentation:** the latest `main` commit from [Shopify/theme-liquid-docs](https://github.com/Shopify/theme-liquid-docs).
+
+For the selected Theme Tools release, the workflow also reads:
+
+- the required **Node.js** version from the official `dev.yml`;
+- the exact **pnpm** version from the upstream `packageManager` field.
+
+The workflow runs every day at **06:00 UTC**. It also runs when `.github/workflows/update-theme-check.yml` or files under `scripts/**` change, and it can be launched manually from **Actions → Update Shopify Theme Check Environment**.
+
+If the same Theme Check version and Liquid documentation revision already have a complete published release, scheduled runs skip the rebuild. Manual runs can use the `force` option to rebuild the same upstream state.
+
+## Build process
+
+The GitHub Actions workflow:
+
+1. Detects the latest stable Theme Check version and latest Liquid documentation commit.
+2. Checks whether that exact upstream state already has a complete release.
+3. Clones the matching official `Shopify/theme-tools` release tag with recursive submodules.
+4. Clones `Shopify/theme-liquid-docs` and verifies its exact commit.
+5. Reads the upstream Node.js version from `dev.yml`.
+6. Reads and installs the pnpm version declared by Theme Tools.
+7. Installs dependencies with `pnpm install --frozen-lockfile`.
+8. Builds the complete Theme Tools monorepo.
+9. Runs type checking, unit tests, and format validation.
+10. Verifies the expected compiled outputs.
+11. Runs Theme Check against a minimal smoke-test theme.
+12. Packages Theme Tools, dependencies, compiled outputs, Liquid docs, metadata, and the local launcher.
+13. Generates the SHA-256 checksum.
+14. Tests the final archive without pnpm.
+15. Publishes the GitHub Actions artifact and GitHub Release.
+
+Browser downloads are skipped because they are not required for this Theme Check build.
 
 ## Reproducibility
 
@@ -127,8 +152,8 @@ Every release records:
 - Node.js version
 - pnpm version
 - build timestamp
-- target OS/architecture
+- target OS and architecture
 
-The build starts from the official Theme Tools release tag, exact Liquid documentation revision, and frozen upstream lockfile. Dependencies and compiled outputs are generated during the workflow rather than copied from an older installation.
+The build starts from the official Theme Tools release tag, the exact Liquid documentation revision, and the frozen upstream lockfile. Dependencies and compiled outputs are generated during the workflow rather than copied from an older installation.
 
-The installation script also refuses to overwrite an existing destination, so upgrades are installed into a fresh directory rather than modifying a previous bundle in place.
+The installer also refuses to overwrite an existing destination, keeping upgrades isolated from previous installations.
